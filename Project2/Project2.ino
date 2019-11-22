@@ -1,115 +1,186 @@
-const int motor1Pin1=22;
-const int motor1Pin2=23;
-const int motor2Pin1=24;
-const int motor2Pin2=25;
-// ------- VAR CNY70 ----------
-unsigned int referenciaBlanco = 100;
-unsigned int referenciaSinSuperficie = 20;
-unsigned int lecturaCNY70 = 0;
-// ---------------------------
-
+#include "Variables.h"
+#include "Setup.h"
+#include "Utiles.h"
+#include "Colisiones.h"
 void setup() {
-  Serial.begin(9600); //Configuracion de la velocidad serial
-/*
-  pinMode(motor1Pin1, OUTPUT);
-  pinMode(motor1Pin2, OUTPUT);
-  pinMode(motor2Pin1, OUTPUT);
-  pinMode(motor2Pin2, OUTPUT);
-
-  pinMode(2, OUTPUT);
-  pinMode(3, OUTPUT);
-  pinMode(4, OUTPUT);
-  pinMode(5, OUTPUT);
-  pinMode(6, OUTPUT);
-  
-  digitalWrite(motor1Pin1, HIGH);  
-  digitalWrite(motor1Pin2, LOW);  
-  digitalWrite(motor2Pin1, HIGH);  
-  digitalWrite(motor2Pin2, LOW);
-  */  
+  Serial.begin(9600);//iniciailzamos la comunicación
+  SetupMotores();
+  //---------------------------------
+  SetupUltrasonico();
+  SetUpSensorColor();
+  encender();
 }
 
 void loop() {
-  lecturaCNY70 = analogRead(A0);
-/*
-  if((lecturaCNY70 >= 0) && (lecturaCNY70 <= referenciaSinSuperficie )) {
-    Serial.println("Sin Superficie");
+  //    Serial.println("Lectura: ");
+  //          Serial.println(medirDistanciaSensorUltrasonico());
+  //          Serial.println(medirDistanciaSensorUltrasonicoR());
+  //          Serial.println(medirDistanciaSensorUltrasonicoL());
+  //    Serial.println(analogRead(A1)); //Imprime el valor de la lectura del canal front
+  //    Serial.println(analogRead(A0)); //Imprime el valor de la lectura del canal derecho
+  //    Serial.println(analogRead(A2)); //Imprime el valor de la lectura del canal izquierdo
+
+  detener();
+  //detectarColorF();
+
+  //    Serial.println(analogRead(A1)); //Imprime el valor de la lectura del canal derecho
+  //    delay(1000);
+
+  //girarDerecha();
+  //girarIzquierda();
+  if (runStart) {} else {
+    IA();
+    controlD++;
   }
-  else if((lecturaCNY70 > referenciaSinSuperficie) && (lecturaCNY70 < referenciaBlanco )) {
-    Serial.println("Linea Negra");
-    
+
+  if (controlD > 5) {
+    girarDerecha2();
+    controlD = 0;
   }
-  else if(lecturaCNY70 >= referenciaBlanco){
-    Serial.println("Superficie Blanca");
-  }
-  */
-  Serial.print("Lectura: ");
-  Serial.println(lecturaCNY70); //Imprime el valor de la lectura del canal A0
-  delay(1000); //retardo de 2 segundos entre lectura
-  
-// adelante();
-//  atras();
-//  derecha();
-//  izquierda();
-//  detener();
-//  delay(5000);
+
+
 }
 
-void adelante(){
-  digitalWrite(motor1Pin1, HIGH);  
-  digitalWrite(motor1Pin2, LOW);  
-  digitalWrite(motor2Pin1, HIGH);  
-  digitalWrite(motor2Pin2, LOW);  
-  delay(5000);
+
+
+
+
+void IA() {
+  CalcularTiempo();
+  long int ultimoPunto = millis();
+  if (runStart) {
+    return;
+  }
+  adelante();
+  while (millis() < ultimoPunto + 100) {
+
+  }
+    detener();
+
+  if (colisionFront()) {
+    tiempoDecision = millis();
+    desicionGiro();
+    enviarDato((millis() - tiempoDecision) / 60, 5); //Tiempo de desicion
+    return;
+  }
+  if (colisionRight2()) {
+    girarIzquierda2();
+    return;
+  }
+  if (colisionLeft2()) {
+    girarDerecha2();
+    return;
   }
 
-void atras(){
-  digitalWrite(motor1Pin1, LOW);
-  digitalWrite(motor1Pin2, HIGH);
-  digitalWrite(motor2Pin1, LOW);
-  digitalWrite(motor2Pin2, HIGH);
-  delay(5000);
+
+}
+
+
+
+
+void desicionGiro() {
+  if (runStart) {
+    return;
+  }
+  if (medirDistanciaSensorUltrasonicoR() < 15 && medirDistanciaSensorUltrasonicoL() < 15) {
+    detenerAtras(300);
+    detenerAtras(300);
+    desicionGiro();
+  } else if (medirDistanciaSensorUltrasonicoR() < 15) {
+    direccion = false;
+  } else if (medirDistanciaSensorUltrasonicoL() < 15) {
+    direccion = true;
   }
 
-void  izquierda(){
-  digitalWrite(motor1Pin1, HIGH);  
-  digitalWrite(motor1Pin2, LOW);  
-  digitalWrite(motor2Pin1, LOW);
-  digitalWrite(motor2Pin2, LOW);  
-  delay(5000);
+  if (direccion) {
+    detenerAtras(400);
+    girarDerecha();
+  } else {
+    detenerAtras(400);
+    girarIzquierda();
   }
+}
 
-void derecha(){
-  digitalWrite(motor1Pin1, LOW);  
-  digitalWrite(motor1Pin2, LOW);  
-  digitalWrite(motor2Pin1, HIGH);  
-  digitalWrite(motor2Pin2, LOW);  
-  delay(5000);
-  }
 
-void detener(){
-  digitalWrite(motor1Pin1, LOW);  
-  digitalWrite(motor1Pin2, LOW);  
-  digitalWrite(motor2Pin1, LOW);  
-  digitalWrite(motor2Pin2, LOW);  
-  delay(5000);
-  }
 
-int detectarColor(int valorCNY){
-// 0 = Nada 
-// 1 = Negro
-// 2 = Rojo
-// 3 = Azul
-/*
-  if (sensorValue>=0 && sensorValue<=20){
-    return 0;
-  }else if (sensorValue>=60 && sensorValue<=80){
-    return 1;
-  }else if (sensorValue>=28 && sensorValue<=30){
-    return 2;
-  }else if (valorCNY>=360 && valorCNY<=400){
-    return 3;
+
+void girarDerecha() {
+  derecha();
+  long int ultimoPunto = millis();
+  long int tiempo = 0;
+  long int tiempoAux = 1200;
+
+  while (millis() < ultimoPunto + tiempoAux) {
+    if (runStart) {
+      return;
+    }
+    if (millis() > ultimoPunto + 1000 && colisionFront()) {
+      detenerAtras(300);
+      tiempoAux = tiempoAux + 600;
+      tiempo = tiempo + 600;
+      derecha();
+    }
+    if (colisionRight()) {
+      detener();
+      izquierda();
+      tiempo = tiempo + millis() - ultimoPunto;
+      ultimoPunto = millis();
+      while (millis() < ultimoPunto + tiempo) {      }
+      girarIzquierda();
+      return;
+    }
   }
-  */
-  return 0;
+  direccion = false;
+}
+
+void girarIzquierda() {
+  izquierda();
+  long int ultimoPunto = millis();
+  long int tiempo = 0;
+  long int tiempoAux = 850;
+  while (millis() < ultimoPunto + tiempoAux) {
+    if (runStart) {
+      return;
+    }
+    if (millis() > ultimoPunto + 800 && colisionFront()) {
+      detenerAtras(300);
+      tiempoAux = tiempoAux + 600;
+      tiempo = tiempo + 600;
+      izquierda();
+    }
+    if (colisionLeft()) {
+      tiempo = tiempo + millis() - ultimoPunto;
+      detener();
+      derecha();
+      ultimoPunto = millis();
+      while (millis() < ultimoPunto + tiempo) {      }
+      girarDerecha();
+      return;
+    }
+  }
+  direccion = true;
+}
+
+
+
+void girarDerecha2() {
+  detener();
+  derecha();
+  long int ultimoPunto = millis();
+  while (millis() < ultimoPunto + 150) {
+    if (runStart) {
+      return;
+    }
+  }
+}
+
+void girarIzquierda2() {
+  detener();
+  izquierda();
+  long int ultimoPunto = millis();
+  while (millis() < ultimoPunto + 100) {
+    if (runStart) {
+      return;
+    }
+  }
 }
